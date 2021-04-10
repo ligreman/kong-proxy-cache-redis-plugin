@@ -34,8 +34,8 @@ end
 
 
 return {
-  ["/proxy-cache"] = {
-    resource = "proxy-cache",
+  ["/proxy-cache-redis"] = {
+    resource = "proxy-cache-redis",
 
     DELETE = function()
       for plugin in each_proxy_cache() do
@@ -63,8 +63,8 @@ return {
       return kong.response.exit(204)
     end
   },
-  ["/proxy-cache/:cache_key"] = {
-    resource = "proxy-cache",
+  ["/proxy-cache-redis/:cache_key"] = {
+    resource = "proxy-cache-redis",
 
     GET = function(self)
       for plugin in each_proxy_cache() do
@@ -125,8 +125,8 @@ return {
       return kong.response.exit(404)
     end,
   },
-  ["/proxy-cache/:plugin_id/caches/:cache_key"] = {
-    resource = "proxy-cache",
+  ["/proxy-cache-redis/:plugin_id/caches/:cache_key"] = {
+    resource = "proxy-cache-redis",
 
     GET = function(self)
       local plugin, err = kong.db.plugins:select {

@@ -1,5 +1,5 @@
 local require     = require
-local cache_key   = require "kong.plugins.proxy-cache.cache_key"
+local cache_key   = require "kong.plugins.proxy-cache-redis.cache_key"
 local utils       = require "kong.tools.utils"
 
 
@@ -199,8 +199,9 @@ end
 
 
 -- indicate that we should attempt to cache the response to this request
+-- intentar guardar esta respuesta en caché
 local function signal_cache_req(ctx, cache_key, cache_status)
-  ctx.proxy_cache = {
+  ctx.proxy_cache_redis = {
     cache_key = cache_key,
   }
 
@@ -209,11 +210,12 @@ end
 
 
 local ProxyCacheHandler = {
-  VERSION  = "1.3.0",
-  PRIORITY = 100,
+  VERSION  = "1.3.1-1",
+  PRIORITY = 101,
 }
 
 
+-- Executed upon every Nginx worker process’s startup.
 function ProxyCacheHandler:init_worker()
   -- catch notifications from other nodes that we purged a cache entry
   -- only need one worker to handle purges like this
@@ -255,6 +257,7 @@ function ProxyCacheHandler:init_worker()
 end
 
 
+-- Executed for every request from a client and before it is being proxied to the upstream service.
 function ProxyCacheHandler:access(conf)
   local cc = req_cc()
 
@@ -264,6 +267,7 @@ function ProxyCacheHandler:access(conf)
     return
   end
 
+  -- construye la clave o hash de esta petición
   local consumer = kong.client.get_consumer()
   local route = kong.router.get_route()
   local uri = ngx_re_sub(ngx.var.request, "\\?.*", "", "oj")
@@ -284,7 +288,9 @@ function ProxyCacheHandler:access(conf)
   })
 
   local ctx = kong.ctx.plugin
+  -- Intenta recoger la caché correspondiente a esta key
   local res, err = strategy:fetch(cache_key)
+  -- Si obtengo un error de que no consigo obtener la cache
   if err == "request object not in cache" then -- TODO make this a utils enum err
 
     -- this request wasn't found in the data store, but the client only wanted
@@ -305,6 +311,7 @@ function ProxyCacheHandler:access(conf)
     return
   end
 
+  -- Si la versión de los datos cacheados no es la misma que la actual, purgo (para evitar errores)
   if res.version ~= CACHE_VERSION then
     kong.log.notice("cache format mismatch, purging ", cache_key)
     strategy:purge(cache_key)
@@ -329,6 +336,7 @@ function ProxyCacheHandler:access(conf)
 
   else
     -- don't serve stale data; res may be stored for up to `conf.storage_ttl` secs
+    -- no servir datos obsoletos; se guardará res el número de segundos indicados en el ttl
     if time() - res.timestamp > conf.cache_ttl then
       return signal_cache_req(ctx, cache_key, "Refresh")
     end
@@ -363,9 +371,10 @@ function ProxyCacheHandler:access(conf)
 end
 
 
+-- Executed when all response headers bytes have been received from the upstream service.
 function ProxyCacheHandler:header_filter(conf)
   local ctx = kong.ctx.plugin
-  local proxy_cache = ctx.proxy_cache
+  local proxy_cache = ctx.proxy_cache_redis
   -- don't look at our headers if
   -- a) the request wasn't cacheable, or
   -- b) the request was served from cache
@@ -382,16 +391,18 @@ function ProxyCacheHandler:header_filter(conf)
 
   else
     kong.response.set_header("X-Cache-Status", "Bypass")
-    ctx.proxy_cache = nil
+    ctx.proxy_cache_redis = nil
   end
 
   -- TODO handle Vary header
 end
 
 
+-- Executed for each chunk of the response body received from the upstream service. Since the response is streamed back to the client,
+-- it can exceed the buffer size and be streamed chunk by chunk. hence this method can be called multiple times if the response is large.
 function ProxyCacheHandler:body_filter(conf)
   local ctx = kong.ctx.plugin
-  local proxy_cache = ctx.proxy_cache
+  local proxy_cache = ctx.proxy_cache_redis
   if not proxy_cache then
     return
   end
@@ -421,6 +432,7 @@ function ProxyCacheHandler:body_filter(conf)
     local ttl = conf.storage_ttl or conf.cache_control and proxy_cache.res_ttl or
                 conf.cache_ttl
 
+    -- Almaceno la respuesta y sus datos en caché
     local ok, err = strategy:store(proxy_cache.cache_key, res, ttl)
     if not ok then
       kong.log(err)

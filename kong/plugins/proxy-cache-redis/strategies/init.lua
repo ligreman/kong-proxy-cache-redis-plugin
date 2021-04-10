@@ -6,6 +6,7 @@ local _M = {}
 
 _M.STRATEGY_TYPES = {
   "memory",
+  "redis",
 }
 
 -- strategies that store cache data only on the node, instead of
@@ -16,7 +17,7 @@ _M.LOCAL_DATA_STRATEGIES = {
 }
 
 local function require_strategy(name)
-  return require("kong.plugins.proxy-cache.strategies." .. name)
+  return require("kong.plugins.proxy-cache-redis.strategies." .. name)
 end
 
 return setmetatable(_M, {

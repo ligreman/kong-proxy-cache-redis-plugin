@@ -1,4 +1,4 @@
-local proxy_cache_schema = require "kong.plugins.proxy-cache.schema"
+local proxy_cache_schema = require "kong.plugins.proxy-cache-redis.schema"
 local v = require("spec.helpers").validate_plugin_config_schema
 
 describe("proxy-cache schema", function()

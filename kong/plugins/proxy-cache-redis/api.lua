@@ -1,198 +1,90 @@
-local STRATEGY_PATH = "kong.plugins.proxy-cache.strategies"
-
-
-local require = require
+local redis = require  "kong.plugins.proxy-cache-redis.redis"
 local kong = kong
-local fmt = string.format
-
-
-local function broadcast_purge(plugin_id, cache_key)
-  local data = fmt("%s:%s", plugin_id, cache_key or "nil")
-  kong.log.debug("broadcasting purge '", data, "'")
-  return kong.cluster_events:broadcast("proxy-cache:purge", data)
-end
-
-
-local function each_proxy_cache()
-  local iter = kong.db.plugins:each()
-
-  return function()
-    while true do
-      local plugin, err = iter()
-      if err then
-        return kong.response.exit(500, { message = err })
-      end
-      if not plugin then
-        return
-      end
-      if plugin.name == "proxy-cache" then
-        return plugin
-      end
-    end
-  end
-end
-
 
 return {
-  ["/proxy-cache-redis"] = {
-    resource = "proxy-cache-redis",
+    ["/plugins/:plugin_id/proxy-cache-redis"] = {
 
-    DELETE = function()
-      for plugin in each_proxy_cache() do
+        DELETE = function(self)
+            -- Busco el plugin
+            local plugin, errp = kong.db.plugins:select({ id = self.params.plugin_id })
 
-        local strategy = require(STRATEGY_PATH)({
-          strategy_name = plugin.config.strategy,
-          strategy_opts = plugin.config[plugin.config.strategy],
-        })
-
-        local ok, err = strategy:flush(true)
-        if not ok then
-          return kong.response.exit(500, { message = err })
-        end
-
-        if require(STRATEGY_PATH).LOCAL_DATA_STRATEGIES[plugin.config.strategy]
-        then
-          local ok, err = broadcast_purge(plugin.id, nil)
-          if not ok then
-            kong.log.err("failed broadcasting proxy cache purge to cluster: ", err)
-          end
-        end
-
-      end
-
-      return kong.response.exit(204)
-    end
-  },
-  ["/proxy-cache-redis/:cache_key"] = {
-    resource = "proxy-cache-redis",
-
-    GET = function(self)
-      for plugin in each_proxy_cache() do
-
-        local strategy = require(STRATEGY_PATH)({
-          strategy_name = plugin.config.strategy,
-          strategy_opts = plugin.config[plugin.config.strategy],
-        })
-
-        local cache_val, err = strategy:fetch(self.params.cache_key)
-        if err and err ~= "request object not in cache" then
-          return kong.response.exit(500, err)
-        end
-
-        if cache_val then
-          return kong.response.exit(200, cache_val)
-        end
-
-      end
-
-      -- fell through, not found
-      return kong.response.exit(404)
-    end,
-
-    DELETE = function(self)
-      for plugin in each_proxy_cache() do
-
-        local strategy = require(STRATEGY_PATH)({
-          strategy_name = plugin.config.strategy,
-          strategy_opts = plugin.config[plugin.config.strategy],
-        })
-
-        local cache_val, err = strategy:fetch(self.params.cache_key)
-        if err and err ~= "request object not in cache" then
-          return kong.response.exit(500, err)
-        end
-
-        if cache_val then
-          local _, err = strategy:purge(self.params.cache_key)
-          if err then
-            return kong.response.exit(500, err)
-          end
-
-          if require(STRATEGY_PATH).LOCAL_DATA_STRATEGIES[plugin.config.strategy]
-          then
-            local ok, err = broadcast_purge(plugin.id, self.params.cache_key)
-            if not ok then
-              kong.log.err("failed broadcasting proxy cache purge to cluster: ", err)
+            if errp then
+                kong.log.err("Error retrieving the plugin: " .. errp)
+                return nil
             end
-          end
 
-          return kong.response.exit(204)
+            if not plugin then
+                kong.log.err("Could not find plugin.")
+                return nil
+            end
+
+            local ok, err = redis:flush(plugin.config)
+            if not ok then
+                return kong.response.exit(500, { message = err })
+            end
+
+            return kong.response.exit(204)
         end
+    },
+    ["/plugins/:plugin_id/proxy-cache-redis/:cache_key"] = {
 
-      end
+        GET = function(self)
+            -- Busco el plugin
+            local plugin, errp = kong.db.plugins:select({ id = self.params.plugin_id })
 
-      -- fell through, not found
-      return kong.response.exit(404)
-    end,
-  },
-  ["/proxy-cache-redis/:plugin_id/caches/:cache_key"] = {
-    resource = "proxy-cache-redis",
+            if errp then
+                kong.log.err("Error retrieving the plugin: " .. errp)
+                return nil
+            end
 
-    GET = function(self)
-      local plugin, err = kong.db.plugins:select {
-        id   = self.params.plugin_id,
-      }
-      if err then
-        return kong.response.exit(500, err)
-      end
+            if not plugin then
+                kong.log.err("Could not find plugin.")
+                return nil
+            end
 
-      if not plugin then
-        return kong.response.exit(404)
-      end
+            local cache_val, err = redis:fetch(plugin.config, self.params.cache_key)
+            if err and err ~= "request object not in cache" then
+                return kong.response.exit(500, err)
+            end
 
-      local conf = plugin.config
-      local strategy = require(STRATEGY_PATH)({
-        strategy_name = conf.strategy,
-        strategy_opts = conf[conf.strategy],
-      })
+            if cache_val then
+                return kong.response.exit(200, cache_val)
+            end
 
-      local cache_val, err = strategy:fetch(self.params.cache_key)
-      if err == "request object not in cache" then
-        return kong.response.exit(404)
-      elseif err then
-        return kong.response.exit(500, err)
-      end
+            -- fell through, not found
+            return kong.response.exit(404)
+        end,
 
-      return kong.response.exit(200, cache_val)
-    end,
-    DELETE = function(self)
-      local plugin, err = kong.db.plugins:select {
-        id   = self.params.plugin_id,
-      }
-      if err then
-        return kong.response.exit(500, err)
-      end
+        DELETE = function(self)
+            -- Busco el plugin
+            local plugin, errp = kong.db.plugins:select({ id = self.params.plugin_id })
 
-      if not plugin then
-        return kong.response.exit(404)
-      end
+            if errp then
+                kong.log.err("Error retrieving the plugin: " .. errp)
+                return nil
+            end
 
-      local conf = plugin.config
-      local strategy = require(STRATEGY_PATH)({
-        strategy_name = conf.strategy,
-        strategy_opts = conf[conf.strategy],
-      })
+            if not plugin then
+                kong.log.err("Could not find plugin.")
+                return nil
+            end
 
-      local _, err = strategy:fetch(self.params.cache_key)
-      if err == "request object not in cache" then
-        return kong.response.exit(404)
-      elseif err then
-        return kong.response.exit(500, err)
-      end
+            local cache_val, err = redis:fetch(plugin.config, self.params.cache_key)
+            if err and err ~= "request object not in cache" then
+                return kong.response.exit(500, err)
+            end
 
-      local _, err = strategy:purge(self.params.cache_key)
-      if err then
-        return kong.response.exit(500, err)
-      end
+            if cache_val then
+                local _, err2 = redis:purge(plugin.config, self.params.cache_key)
+                if err2 then
+                    return kong.response.exit(500, err2)
+                end
 
-      if require(STRATEGY_PATH).LOCAL_DATA_STRATEGIES[conf.strategy] then
-        local ok, err = broadcast_purge(plugin.id, self.params.cache_key)
-        if not ok then
-          kong.log.err("failed broadcasting proxy cache purge to cluster: ", err)
-        end
-      end
+                return kong.response.exit(204)
+            end
 
-      return kong.response.exit(204)
-    end
-  },
+            -- fell through, not found
+            return kong.response.exit(404)
+        end,
+    }
 }

@@ -18,7 +18,7 @@ describe("proxy-cache invalidations via: " .. strategy, function()
   local bp
 
   setup(function()
-    bp = helpers.get_db_utils(strategy, nil, {"proxy-cache"})
+    bp = helpers.get_db_utils(strategy, nil, {"proxy-cache-redis"})
 
     route1 = assert(bp.routes:insert {
       hosts = { "route-1.com" },
@@ -29,7 +29,7 @@ describe("proxy-cache invalidations via: " .. strategy, function()
     })
 
     plugin1 = assert(bp.plugins:insert {
-      name = "proxy-cache",
+      name = "proxy-cache-redis",
       route = { id = route1.id },
       config = {
         strategy = "memory",
@@ -41,7 +41,7 @@ describe("proxy-cache invalidations via: " .. strategy, function()
     })
 
     plugin2 = assert(bp.plugins:insert {
-      name = "proxy-cache",
+      name = "proxy-cache-redis",
       route = { id = route2.id },
       config = {
         strategy = "memory",
@@ -66,7 +66,7 @@ describe("proxy-cache invalidations via: " .. strategy, function()
       admin_gui_ssl         = false,
       db_update_frequency   = POLL_INTERVAL,
       db_update_propagation = db_update_propagation,
-      plugins               = "proxy-cache",
+      plugins               = "proxy-cache-redis",
       nginx_conf            = "spec/fixtures/custom_nginx.template",
     })
 
@@ -82,7 +82,7 @@ describe("proxy-cache invalidations via: " .. strategy, function()
       admin_gui_ssl         = false,
       db_update_frequency   = POLL_INTERVAL,
       db_update_propagation = db_update_propagation,
-      plugins               = "proxy-cache",
+      plugins               = "proxy-cache-redis",
     })
 
     client_1       = helpers.http_client("127.0.0.1", 8000)
@@ -190,7 +190,7 @@ describe("proxy-cache invalidations via: " .. strategy, function()
       -- now purge the entry
       local res = assert(admin_client_1:send {
         method = "DELETE",
-        path = "/proxy-cache/" .. plugin1.id .. "/caches/" .. cache_key,
+        path = "/proxy-cache-redis/" .. plugin1.id .. "/caches/" .. cache_key,
       })
 
       assert.res_status(204, res)
@@ -199,7 +199,7 @@ describe("proxy-cache invalidations via: " .. strategy, function()
         -- assert that the entity was purged from the second instance
         res = assert(admin_client_2:send {
           method = "GET",
-          path = "/proxy-cache/" .. plugin1.id .. "/caches/" .. cache_key,
+          path = "/proxy-cache-redis/" .. plugin1.id .. "/caches/" .. cache_key,
         })
         res:read_body()
         return res.status == 404
@@ -232,7 +232,7 @@ describe("proxy-cache invalidations via: " .. strategy, function()
       -- now purge the entry
       res = assert(admin_client_1:send {
         method = "DELETE",
-        path = "/proxy-cache/" .. cache_key,
+        path = "/proxy-cache-redis/" .. cache_key,
       })
 
       assert.res_status(204, res)
@@ -244,7 +244,7 @@ describe("proxy-cache invalidations via: " .. strategy, function()
         -- assert that the entity was purged from the second instance
         res = assert(admin_client_2:send {
           method = "GET",
-          path = "/proxy-cache/" .. cache_key,
+          path = "/proxy-cache-redis/" .. cache_key,
         })
         res:read_body()
         return res.status == 404
@@ -254,14 +254,14 @@ describe("proxy-cache invalidations via: " .. strategy, function()
     it("does not affect cache entries under other plugin instances", function()
       local res = assert(admin_client_1:send {
         method = "GET",
-        path = "/proxy-cache/" .. plugin2.id .. "/caches/" .. cache_key2,
+        path = "/proxy-cache-redis/" .. plugin2.id .. "/caches/" .. cache_key2,
       })
 
       assert.res_status(200, res)
 
       res = assert(admin_client_2:send {
         method = "GET",
-        path = "/proxy-cache/" .. plugin2.id .. "/caches/" .. cache_key2,
+        path = "/proxy-cache-redis/" .. plugin2.id .. "/caches/" .. cache_key2,
       })
 
       assert.res_status(200, res)
@@ -271,16 +271,16 @@ describe("proxy-cache invalidations via: " .. strategy, function()
       do
         local res = assert(admin_client_1:send {
           method = "DELETE",
-          path = "/proxy-cache/",
+          path = "/proxy-cache-redis/",
         })
-  
+
         assert.res_status(204, res)
       end
 
       helpers.wait_until(function()
         local res = assert(admin_client_1:send {
           method = "GET",
-          path = "/proxy-cache/" .. plugin2.id .. "/caches/" .. cache_key2,
+          path = "/proxy-cache-redis/" .. plugin2.id .. "/caches/" .. cache_key2,
         })
         res:read_body()
         return res.status == 404
@@ -289,7 +289,7 @@ describe("proxy-cache invalidations via: " .. strategy, function()
       helpers.wait_until(function()
         local res = assert(admin_client_2:send {
           method = "GET",
-          path = "/proxy-cache/" .. plugin2.id .. "/caches/" .. cache_key2,
+          path = "/proxy-cache-redis/" .. plugin2.id .. "/caches/" .. cache_key2,
         })
         res:read_body()
         return res.status == 404

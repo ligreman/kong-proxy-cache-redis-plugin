@@ -1,8 +1,8 @@
-package = "kong-proxy-cache-redis-redis-plugin"
-version = "1.3.1-1"
+package = "kong-proxy-cache-redis-plugin"
+version = "1.0.0-0"
 
 source = {
-  url = "git://github.com/ligreman/kong-proxy-cache-redis-redis-plugin"
+  url = "git://github.com/ligreman/kong-proxy-cache-redis-plugin"
 }
 
 supported_platforms = {"linux", "macosx"}
@@ -23,7 +23,6 @@ build = {
     ["kong.plugins.proxy-cache-redis.cache_key"]            = "kong/plugins/proxy-cache-redis/cache_key.lua",
     ["kong.plugins.proxy-cache-redis.schema"]               = "kong/plugins/proxy-cache-redis/schema.lua",
     ["kong.plugins.proxy-cache-redis.api"]                  = "kong/plugins/proxy-cache-redis/api.lua",
-    ["kong.plugins.proxy-cache-redis.strategies"]           = "kong/plugins/proxy-cache-redis/strategies/init.lua",
-    ["kong.plugins.proxy-cache-redis.strategies.memory"]    = "kong/plugins/proxy-cache-redis/strategies/memory.lua",
+    ["kong.plugins.proxy-cache-redis.redis"]                = "kong/plugins/proxy-cache-redis/redis.lua",
   }
 }

@@ -14,7 +14,7 @@ local strategies = require("kong.plugins.proxy-cache-redis.strategies")
 
 do
   local policy = "memory"
-  describe("proxy-cache access with policy: " .. policy, function()
+  describe("proxy-cache-redis access with policy: " .. policy, function()
     local client, admin_client
     --local cache_key
     local policy_config = { dictionary_name = "kong", }
@@ -26,7 +26,7 @@ do
 
     setup(function()
 
-      local bp = helpers.get_db_utils(nil, nil, {"proxy-cache"})
+      local bp = helpers.get_db_utils(nil, nil, {"proxy-cache-redis"})
       strategy:flush(true)
 
       local route1 = assert(bp.routes:insert {
@@ -119,7 +119,7 @@ do
       })
 
       assert(bp.plugins:insert {
-        name = "proxy-cache",
+        name = "proxy-cache-redis",
         route = { id = route1.id },
         config = {
           strategy = policy,
@@ -129,7 +129,7 @@ do
       })
 
       assert(bp.plugins:insert {
-        name = "proxy-cache",
+        name = "proxy-cache-redis",
         route = { id = route2.id },
         config = {
           strategy = policy,
@@ -140,7 +140,7 @@ do
 
       -- global plugin for routes 3 and 4
       assert(bp.plugins:insert {
-        name = "proxy-cache",
+        name = "proxy-cache-redis",
         config = {
           strategy = policy,
           content_type = { "text/plain", "application/json" },
@@ -149,7 +149,7 @@ do
       })
 
       assert(bp.plugins:insert {
-        name = "proxy-cache",
+        name = "proxy-cache-redis",
         route = { id = route5.id },
         config = {
           strategy = policy,
@@ -159,7 +159,7 @@ do
       })
 
       assert(bp.plugins:insert {
-        name = "proxy-cache",
+        name = "proxy-cache-redis",
         route = { id = route6.id },
         config = {
           strategy = policy,
@@ -170,7 +170,7 @@ do
       })
 
       assert(bp.plugins:insert {
-        name = "proxy-cache",
+        name = "proxy-cache-redis",
         route = { id = route7.id },
         config = {
           strategy = policy,
@@ -181,7 +181,7 @@ do
       })
 
       assert(bp.plugins:insert {
-        name = "proxy-cache",
+        name = "proxy-cache-redis",
         route = { id = route8.id },
         config = {
           strategy = policy,
@@ -193,7 +193,7 @@ do
       })
 
       assert(bp.plugins:insert {
-        name = "proxy-cache",
+        name = "proxy-cache-redis",
         route = { id = route9.id },
         config = {
           strategy = policy,
@@ -205,7 +205,7 @@ do
       })
 
       assert(bp.plugins:insert {
-        name = "proxy-cache",
+        name = "proxy-cache-redis",
         route = { id = route10.id },
         config = {
           strategy = policy,
@@ -217,7 +217,7 @@ do
       })
 
       assert(bp.plugins:insert {
-        name = "proxy-cache",
+        name = "proxy-cache-redis",
         route = { id = route11.id },
         config = {
           strategy = policy,
@@ -230,7 +230,7 @@ do
       })
 
       assert(bp.plugins:insert {
-        name = "proxy-cache",
+        name = "proxy-cache-redis",
         route = { id = route12.id },
         config = {
           strategy = policy,
@@ -243,7 +243,7 @@ do
       })
 
       assert(helpers.start_kong({
-        plugins = "bundled,proxy-cache",
+        plugins = "bundled,proxy-cache-redis",
         nginx_conf = "spec/fixtures/custom_nginx.template",
       }))
     end)

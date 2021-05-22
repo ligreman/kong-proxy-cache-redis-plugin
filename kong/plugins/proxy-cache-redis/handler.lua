@@ -219,7 +219,7 @@ local function store_cache_value(premature, conf, req_body, status, proxy_cache)
 end
 
 local ProxyCacheHandler = {
-    VERSION = "2.0.0-0",
+    VERSION = "2.0.1-0",
     PRIORITY = 101,
 }
 
@@ -245,7 +245,8 @@ function ProxyCacheHandler:access(conf)
     local consumer = kong.client.get_consumer()
     local route = kong.router.get_route()
     local uri = ngx_re_sub(ngx.var.request, "\\?.*", "", "oj")
-    local cache_key = cache_key.build_cache_key(consumer and consumer.id,
+    local the_cache_key = cache_key.build_cache_key(
+            consumer and consumer.id,
             route and route.id,
             kong.request.get_method(),
             uri,
@@ -253,12 +254,12 @@ function ProxyCacheHandler:access(conf)
             kong.request.get_headers(),
             conf)
 
-    kong.response.set_header("X-Cache-Key", cache_key)
+    kong.response.set_header("X-Cache-Key", the_cache_key)
 
     -- try to fetch the cached object from the computed cache key
     local ctx = kong.ctx.plugin
     -- Intenta recoger la caché correspondiente a esta key
-    local res, err = redis:fetch(conf, cache_key)
+    local res, err = redis:fetch(conf, the_cache_key)
     -- Si obtengo un error de que no consigo obtener la cache
     if err == "request object not in cache" then
 
@@ -273,7 +274,7 @@ function ProxyCacheHandler:access(conf)
         -- this request is cacheable but wasn't found in the data store
         -- make a note that we should store it in cache later,
         -- and pass the request upstream
-        return signal_cache_req(ctx, cache_key)
+        return signal_cache_req(ctx, the_cache_key)
 
     elseif err then
         kong.log.err(err)
@@ -282,25 +283,25 @@ function ProxyCacheHandler:access(conf)
 
     -- Si la versión de los datos cacheados no es la misma que la actual, purgo (para evitar errores)
     if res.version ~= CACHE_VERSION then
-        kong.log.notice("cache format mismatch, purging ", cache_key)
-        redis:purge(conf, cache_key)
-        return signal_cache_req(ctx, cache_key, "Bypass")
+        kong.log.notice("cache format mismatch, purging ", the_cache_key)
+        redis:purge(conf, the_cache_key)
+        return signal_cache_req(ctx, the_cache_key, "Bypass")
     end
 
     -- figure out if the client will accept our cache value
     if conf.cache_control then
         if cc["max-age"] and time() - res.timestamp > cc["max-age"] then
-            return signal_cache_req(ctx, cache_key, "Refresh")
+            return signal_cache_req(ctx, the_cache_key, "Refresh")
         end
 
         if cc["max-stale"] and time() - res.timestamp - res.ttl > cc["max-stale"]
         then
-            return signal_cache_req(ctx, cache_key, "Refresh")
+            return signal_cache_req(ctx, the_cache_key, "Refresh")
         end
 
         if cc["min-fresh"] and res.ttl - (time() - res.timestamp) < cc["min-fresh"]
         then
-            return signal_cache_req(ctx, cache_key, "Refresh")
+            return signal_cache_req(ctx, the_cache_key, "Refresh")
         end
 
     else
@@ -308,7 +309,7 @@ function ProxyCacheHandler:access(conf)
         -- no servir datos obsoletos; se guardará res los segundos indicados en conf.storage_ttl
         -- pero sólo se sirven durante conf.cache_ttl
         if time() - res.timestamp > conf.cache_ttl then
-            return signal_cache_req(ctx, cache_key, "Refresh")
+            return signal_cache_req(ctx, the_cache_key, "Refresh")
         end
     end
 

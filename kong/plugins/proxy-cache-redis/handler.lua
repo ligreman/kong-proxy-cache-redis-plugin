@@ -61,8 +61,7 @@ local function parse_directive_header(h)
 
     local m = iter()
     while m do
-        local _, err = ngx_re_match(m[0], [[^\s*([^=]+)(?:=(.+))?]],
-                "oj", nil, res)
+        local _, err = ngx_re_match(m[0], [[^\s*([^=]+)(?:=(.+))?]], "oj", nil, res)
         if err then
             kong.log.err(err)
         end
@@ -202,7 +201,6 @@ end
 
 -- Guardar un valor en el Store
 local function store_cache_value(premature, conf, req_body, status, proxy_cache)
-    --kong.log.err("%% mira que ttl me viene de conf ", conf.cache_ttl)
 
     local res = {
         status = status,

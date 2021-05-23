@@ -26,6 +26,8 @@ end
 --
 -- The elements are sorted so we get consistent cache actual_keys no matter
 -- the order in which params came in the request
+--
+-- is_json: boolean that indicates that args are a JSON object (converted into a lua table)
 local function generate_key_from(args, vary_fields, is_json)
     local cache_key = {}
 
@@ -95,6 +97,7 @@ local function json_body_key(json_body, plugin_config)
 end
 _M.json_body_key = json_body_key
 
+
 local function prefix_uuid(consumer_id, route_id)
 
     -- authenticated route
@@ -111,6 +114,7 @@ local function prefix_uuid(consumer_id, route_id)
     return "default"
 end
 _M.prefix_uuid = prefix_uuid
+
 
 function _M.build_cache_key(consumer_id, route_id, method, uri, params_table, headers_table, json_body_table, conf)
 

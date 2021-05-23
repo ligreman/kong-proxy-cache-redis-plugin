@@ -20,6 +20,11 @@ return {
                     },
                     required = true
                 } },
+                { allow_force_cache_header = {
+                    type = "boolean",
+                    default = false,
+                    required = true,
+                } },
                 { content_type = {
                     type = "array",
                     default = { "text/plain", "application/json" },
@@ -46,6 +51,10 @@ return {
                     elements = { type = "string" },
                 } },
                 { vary_headers = {
+                    type = "array",
+                    elements = { type = "string" },
+                } },
+                { vary_body_json_fields = {
                     type = "array",
                     elements = { type = "string" },
                 } },

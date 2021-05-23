@@ -109,6 +109,13 @@ end
 -- Comprueba si la petición es cacheble
 local function cacheable_request(conf, cc)
     do
+        -- check if is allowed the force cache, and if the header is present
+        local forceHeader = kong.request.get_header("X-Proxy-Cache-Redis-Force")
+        if conf.allow_force_cache_header and forceHeader == "true" then
+            return true
+        end
+
+        -- check request method
         local method = kong.request.get_method()
         local method_match = false
         for i = 1, #conf.request_method do
@@ -124,8 +131,7 @@ local function cacheable_request(conf, cc)
     end
 
     -- check for explicit disallow directives
-    if conf.cache_control and (cc["no-store"] or cc["no-cache"] or
-            ngx.var.authorization) then
+    if conf.cache_control and (cc["no-store"] or cc["no-cache"] or ngx.var.authorization) then
         return false
     end
 
@@ -235,11 +241,22 @@ function ProxyCacheHandler:access(conf)
 
     local cc = req_cc()
 
-    -- if we know this request isnt cacheable, bail out
+    -- if we know this request is not cacheable, bail out
     if not cacheable_request(conf, cc) then
         kong.response.set_header("X-Cache-Status", "Bypass")
         return
     end
+
+    -- Si en configuración me indican que he de tener en cuenta el body JSON
+    local theBody = "";
+    if (conf.vary_body_json_fields or EMPTY)[1] then
+        -- Si el body es un JSON lo tengo en cuenta
+        local body, err6, mimetype = kong.request.get_body('application/json')
+        if not err6 and mimetype == 'application/json' then
+            theBody = body
+        end
+    end
+
 
     -- construye la clave o hash de esta petición
     local consumer = kong.client.get_consumer()
@@ -252,6 +269,7 @@ function ProxyCacheHandler:access(conf)
             uri,
             kong.request.get_query(),
             kong.request.get_headers(),
+            theBody,
             conf)
 
     kong.response.set_header("X-Cache-Key", the_cache_key)

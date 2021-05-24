@@ -53,7 +53,7 @@ The plugin works in the same way as the official `proxy-cache` plugin, in terms 
 `config.vary_body_json_fields`|array of strings|*optional*| |Relevant JSON fields in the body of the request, to be considered for the cache key. If undefined, none of the fields in the body are taken into consideration. Note: only works on  string or number fields, not on fields containing arrays or objects.
 `config.vary_query_params`|array of strings|*optional*| |Relevant query parameters considered for the cache key. If undefined, all params are taken into consideration.
 `config.cache_ttl`|integer|*required*|300|TTL, in seconds, of cache resources.
-`config.cache_control`|boolean|*required*|false|When enabled, respect the Cache-Control behaviors defined in RFC7234.
+`config.cache_control`|boolean|*required*|false|When enabled, respect the Cache-Control behaviors defined in RFC7234. It allows the use of the header Cache-Control with its values (no-store, no-cache, private, only-if-cached, max-age...). 
 `config.storage_ttl`|integer|*required*| |Number of seconds to keep resources in the storage backend. This value is independent of cache_ttl or resource TTLs defined by Cache-Control behaviors. The resources may be stored for up to `storage_ttl` secs but served only for `cache_ttl`.
 `config.redis_host`|string|*required*| |The hostname or IP address of the redis server.
 `config.redis_port`|integer|*optional*|6379|The port of the redis server.

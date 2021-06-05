@@ -16,7 +16,12 @@ It caches all responses in a Redis server.
 
 ## Cache TTL
 
-TTL for serving the cached data. Kong sends a `X-Cache-Status` with value `Refresh` if the resource was found in cache, but could not satisfy the request, due to Cache-Control behaviors or reaching its hard-coded cache_ttl threshold.
+TTL for serving the cached data. Kong sends a `X-Cache-Status` with value:
+
+- `Refresh` if the resource was found in cache, but could not satisfy the request, due to Cache-Control behaviors or reaching its hard-coded cache_ttl threshold.
+- `ByPass` if the request was not cacheable.
+- `Hit` if the request was cacheable, and a cached value was found and returned.
+- `Miss` if the request was cacheable, and no cached value was found.
 
 ## Storage TTL
 
@@ -52,11 +57,41 @@ The plugin works in the same way as the official `proxy-cache` plugin, in terms 
 `config.vary_headers`|array of strings|*optional*| |Relevant headers considered for the cache key. If undefined, none of the headers are taken into consideration.
 `config.vary_body_json_fields`|array of strings|*optional*| |Relevant JSON fields in the body of the request, to be considered for the cache key. If undefined, none of the fields in the body are taken into consideration. Note: only works on  string or number fields, not on fields containing arrays or objects.
 `config.vary_query_params`|array of strings|*optional*| |Relevant query parameters considered for the cache key. If undefined, all params are taken into consideration.
-`config.cache_ttl`|integer|*required*|300|TTL, in seconds, of cache resources.
-`config.cache_control`|boolean|*required*|false|When enabled, respect the Cache-Control behaviors defined in RFC7234. It allows the use of the header Cache-Control with its values (no-store, no-cache, private, only-if-cached, max-age...). 
+`config.cache_ttl`|integer|*required*|300|TTL, in seconds, of cache resources. May be overriden if `cache-control` is true and the client sends `s-maxage` or `max-age` in Cache-Control headers. 
+`config.cache_control`|boolean|*required*|false|When enabled, respect the Cache-Control behaviors defined in RFC7234. It allows the use of the header Cache-Control with its values (no-store, no-cache, private, only-if-cached, max-age...). Read more info below.
 `config.storage_ttl`|integer|*required*| |Number of seconds to keep resources in the storage backend. This value is independent of cache_ttl or resource TTLs defined by Cache-Control behaviors. The resources may be stored for up to `storage_ttl` secs but served only for `cache_ttl`.
 `config.redis_host`|string|*required*| |The hostname or IP address of the redis server.
 `config.redis_port`|integer|*optional*|6379|The port of the redis server.
 `config.redis_timeout`|integer|*optional*|2000|The timeout in milliseconds for the redis connection.
 `config.redis_password`|string|*optional*| |The password (if required) to authenticate to the redis server.
 `config.redis_database`|string|*optional*|0|The Redis database to use for caching the resources.
+
+## Cache-Control header
+
+When `cache-control` is true in the configuration of the plugin, it reads the following Cache-Control headers:
+
+- `no-cache` or `no-store`
+    - This plugin manages both values the same way. A request with any (or both) of these Cache-Control header values, will not be cached or stored.
+- `private`
+    - The response will not be cached, but the server may answer with a previously cached response. 
+- `max-age=<seconds>`
+    - The maximum amount of time a resource is considered fresh. Unlike Expires, this directive is relative to the time of the request.
+- `max-stale[=<seconds>]`
+    - Indicates the client will accept a stale response. An optional value in seconds indicates the upper limit of staleness the client will accept.
+- `min-fresh=<seconds>`
+  - Indicates the client wants a response that will still be fresh for at least the specified number of seconds.
+- `only-if-cached`
+  - Set by the client to indicate "do not use the network" for the response. The cache should either respond using a stored response, or respond with a 504 status code.
+
+
+
+Example of headers:
+```
+Cache-Control: max-age=<seconds>
+Cache-Control: max-stale[=<seconds>]
+Cache-Control: min-fresh=<seconds>
+Cache-Control: no-cache
+Cache-Control: no-store
+```
+
+More info: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control

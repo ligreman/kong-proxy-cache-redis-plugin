@@ -14,6 +14,14 @@ time.
 
 It caches all responses in a Redis server.
 
+## Kong Plugin Priority
+
+This plugin has its priority modified to be executed before the rate-limit plungin. This way a request that is answered by the cache (a cache Hit), does not count in the rate-limit.
+
+The original proxy-cache plugin from Kong Hub has a priority of 101. This plugin has a 902 priority, right before the rate-limit that has 901.
+
+If you want a proxy-cache-redis plugin with the original priority so that it is executed after the rate-limit one, just modify the code and change the priority in handler.lua.
+
 ## Cache TTL
 
 TTL for serving the cached data. Kong sends a `X-Cache-Status` with value:
